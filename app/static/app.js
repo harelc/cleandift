@@ -44,14 +44,17 @@ async function loadHealth() {
 }
 
 function drawImage(canvas, img) {
-  // Render at natural size with a CSS max-width clamp
-  const maxW = 560, maxH = 560;
-  const scale = Math.min(maxW / img.naturalWidth, maxH / img.naturalHeight, 1);
-  canvas.width = Math.round(img.naturalWidth * scale);
-  canvas.height = Math.round(img.naturalHeight * scale);
+  // Bitmap = natural size; CSS scales display to fill the pane (both panes equal-width).
+  canvas.width = img.naturalWidth;
+  canvas.height = img.naturalHeight;
   const ctx = canvas.getContext("2d");
-  ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-  return scale;
+  ctx.drawImage(img, 0, 0);
+}
+
+function dispScale(rec) {
+  // Display pixels per natural pixel — computed live, robust to layout changes.
+  const r = rec.canvas.getBoundingClientRect();
+  return r.width / rec.img.naturalWidth;
 }
 
 async function uploadFile(file) {
@@ -79,10 +82,9 @@ async function onFile(which, file) {
     state[which] = rec;
     const canvas = $(which === "src" ? "srcCanvas" : "tgtCanvas");
     const overlay = $(which === "src" ? "srcOverlay" : "tgtOverlay");
-    const scale = drawImage(canvas, rec.img);
+    drawImage(canvas, rec.img);
     overlay.width = canvas.width;
     overlay.height = canvas.height;
-    rec.scale = scale;
     rec.canvas = canvas;
     rec.overlay = overlay;
     clearOverlays();
@@ -105,26 +107,30 @@ function clearOverlays() {
 }
 
 function imgToCanvas(rec, x, y) {
-  return { x: x * rec.scale, y: y * rec.scale };
+  // Overlay bitmap == natural-image coords, no scaling needed.
+  return { x, y };
 }
 
 function drawDot(rec, x, y, color, label) {
   const ctx = rec.overlay.getContext("2d");
   const p = imgToCanvas(rec, x, y);
+  // Scale dot/text relative to display size so they look consistent across images.
+  const s = 1 / Math.max(0.01, dispScale(rec));
+  const r = 7 * s;
   ctx.beginPath();
-  ctx.arc(p.x, p.y, 7, 0, Math.PI * 2);
-  ctx.lineWidth = 2;
+  ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
+  ctx.lineWidth = 2 * s;
   ctx.strokeStyle = "white";
   ctx.fillStyle = color;
   ctx.fill(); ctx.stroke();
   if (label !== undefined) {
-    ctx.font = "bold 11px ui-monospace, Menlo, monospace";
+    ctx.font = `bold ${Math.round(11 * s)}px ui-monospace, Menlo, monospace`;
     ctx.fillStyle = "white";
     ctx.strokeStyle = "black";
-    ctx.lineWidth = 3;
+    ctx.lineWidth = 3 * s;
     const t = String(label);
-    ctx.strokeText(t, p.x + 9, p.y - 9);
-    ctx.fillText(t, p.x + 9, p.y - 9);
+    ctx.strokeText(t, p.x + 9 * s, p.y - 9 * s);
+    ctx.fillText(t, p.x + 9 * s, p.y - 9 * s);
   }
 }
 
@@ -151,9 +157,10 @@ function renderLines() {
 
   function paneCoord(rec, ix, iy) {
     const r = rec.canvas.getBoundingClientRect();
+    const s = r.width / rec.img.naturalWidth;
     return {
-      x: r.left - svgR.left + ix * rec.scale,
-      y: r.top - svgR.top + iy * rec.scale,
+      x: r.left - svgR.left + ix * s,
+      y: r.top - svgR.top + iy * s,
     };
   }
 
@@ -185,10 +192,9 @@ async function handleCanvasClick(which, ev) {
   if (state.busy) return;
 
   const rect = rec.canvas.getBoundingClientRect();
-  const cx = ev.clientX - rect.left;
-  const cy = ev.clientY - rect.top;
-  const ix = cx / rec.scale;
-  const iy = cy / rec.scale;
+  const s = rect.width / rec.img.naturalWidth;
+  const ix = (ev.clientX - rect.left) / s;
+  const iy = (ev.clientY - rect.top) / s;
 
   state.busy = true;
   $("runBtn").disabled = true;
@@ -315,14 +321,13 @@ $("runBtn").addEventListener("click", () => {
 $("swapBtn").addEventListener("click", () => {
   const a = state.src, b = state.tgt;
   state.src = b; state.tgt = a;
-  // re-render: redraw images onto canvases
   for (const k of ["src", "tgt"]) {
     if (state[k]) {
       const canvas = $(k === "src" ? "srcCanvas" : "tgtCanvas");
       const overlay = $(k === "src" ? "srcOverlay" : "tgtOverlay");
       state[k].canvas = canvas;
       state[k].overlay = overlay;
-      state[k].scale = drawImage(canvas, state[k].img);
+      drawImage(canvas, state[k].img);
       overlay.width = canvas.width; overlay.height = canvas.height;
     }
   }

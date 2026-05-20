@@ -48,8 +48,8 @@ main#viewer > svg#lines { grid-column: 1 / -1; grid-row: 1; }
 .paneTitle .hint { color: #6b7385; }
 .canvasWrap {
   position: relative;
-  display: inline-block;
-  max-width: 100%;
+  display: block;
+  width: 100%;
   background: #0a0c11;
   border: 1px solid #232733;
   border-radius: 6px;
@@ -57,7 +57,7 @@ main#viewer > svg#lines { grid-column: 1 / -1; grid-row: 1; }
 }
 .canvasWrap canvas {
   display: block;
-  max-width: 100%;
+  width: 100%;
   height: auto;
 }
 .canvasWrap canvas:nth-child(2) {
