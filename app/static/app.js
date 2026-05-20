@@ -43,14 +43,8 @@ async function loadHealth() {
   }
 }
 
-function drawImage(canvas, img) {
-  canvas.width = img.naturalWidth;
-  canvas.height = img.naturalHeight;
-  canvas.getContext("2d").drawImage(img, 0, 0);
-}
-
 function dispScale(rec) {
-  const r = rec.canvas.getBoundingClientRect();
+  const r = rec.imgEl.getBoundingClientRect();
   return r.width / rec.img.naturalWidth;
 }
 
@@ -73,9 +67,8 @@ function relayoutCanvases() {
   for (const k of ["src", "tgt"]) if (state[k]) {
     const w = Math.round(state[k].img.naturalWidth * scale);
     // Only set width on the main canvas; CSS `height: auto` keeps aspect correct.
-    state[k].canvas.style.width = w + "px";
-    state[k].canvas.style.height = ""; // let CSS auto apply
-    // Overlay is position:absolute; width:100%; height:100% — fills the main canvas.
+    state[k].imgEl.style.width = w + "px";
+    // Overlay is position:absolute width:100% height:100% — follows the img automatically.
   }
   redrawDots();
   renderLines();
@@ -105,12 +98,12 @@ async function onFile(which, file) {
   try {
     const rec = await uploadFile(file);
     state[which] = rec;
-    const canvas = $(which === "src" ? "srcCanvas" : "tgtCanvas");
+    const imgEl = $(which === "src" ? "srcImg" : "tgtImg");
     const overlay = $(which === "src" ? "srcOverlay" : "tgtOverlay");
-    drawImage(canvas, rec.img);
-    overlay.width = canvas.width;
-    overlay.height = canvas.height;
-    rec.canvas = canvas;
+    imgEl.src = rec.img.src;
+    overlay.width = rec.img.naturalWidth;
+    overlay.height = rec.img.naturalHeight;
+    rec.imgEl = imgEl;
     rec.overlay = overlay;
     $(which === "src" ? "srcWrap" : "tgtWrap").classList.remove("empty");
     clearOverlays();
@@ -184,7 +177,7 @@ function renderLines() {
   svg.setAttribute("preserveAspectRatio", "none");
 
   function paneCoord(rec, ix, iy) {
-    const r = rec.canvas.getBoundingClientRect();
+    const r = rec.imgEl.getBoundingClientRect();
     const s = r.width / rec.img.naturalWidth;
     return { x: r.left - svgR.left + ix * s, y: r.top - svgR.top + iy * s };
   }
@@ -216,7 +209,7 @@ async function handleCanvasClick(which, ev) {
   if (!rec || !other) { log("need both images first", "err"); return; }
   if (state.busy) return;
 
-  const rect = rec.canvas.getBoundingClientRect();
+  const rect = rec.imgEl.getBoundingClientRect();
   const s = rect.width / rec.img.naturalWidth;
   const ix = (ev.clientX - rect.left) / s;
   const iy = (ev.clientY - rect.top) / s;
@@ -328,8 +321,8 @@ async function runTopN() {
 }
 
 function setupCanvasClicks() {
-  $("srcCanvas").addEventListener("click", (e) => handleCanvasClick("src", e));
-  $("tgtCanvas").addEventListener("click", (e) => handleCanvasClick("tgt", e));
+  $("srcImg").addEventListener("click", (e) => handleCanvasClick("src", e));
+  $("tgtImg").addEventListener("click", (e) => handleCanvasClick("tgt", e));
 }
 
 $("srcFile").addEventListener("change", (e) => onFile("src", e.target.files[0]));
@@ -345,12 +338,13 @@ $("swapBtn").addEventListener("click", () => {
   state.src = b; state.tgt = a;
   for (const k of ["src", "tgt"]) {
     if (state[k]) {
-      const canvas = $(k === "src" ? "srcCanvas" : "tgtCanvas");
+      const imgEl = $(k === "src" ? "srcImg" : "tgtImg");
       const overlay = $(k === "src" ? "srcOverlay" : "tgtOverlay");
-      state[k].canvas = canvas;
+      imgEl.src = state[k].img.src;
+      overlay.width = state[k].img.naturalWidth;
+      overlay.height = state[k].img.naturalHeight;
+      state[k].imgEl = imgEl;
       state[k].overlay = overlay;
-      drawImage(canvas, state[k].img);
-      overlay.width = canvas.width; overlay.height = canvas.height;
     }
   }
   clearOverlays();
