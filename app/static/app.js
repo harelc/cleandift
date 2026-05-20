@@ -145,16 +145,15 @@ function drawHeatmapOnTarget(dataUrl) {
 function renderLines() {
   const svg = $("lines");
   svg.innerHTML = "";
-  const main = $("viewer").getBoundingClientRect();
-  svg.setAttribute("viewBox", `0 0 ${main.width} ${main.height}`);
-  svg.style.width = main.width + "px";
-  svg.style.height = main.height + "px";
+  const svgR = svg.getBoundingClientRect();
+  svg.setAttribute("viewBox", `0 0 ${svgR.width} ${svgR.height}`);
+  svg.setAttribute("preserveAspectRatio", "none");
 
   function paneCoord(rec, ix, iy) {
     const r = rec.canvas.getBoundingClientRect();
     return {
-      x: r.left - main.left + ix * rec.scale,
-      y: r.top - main.top + iy * rec.scale,
+      x: r.left - svgR.left + ix * rec.scale,
+      y: r.top - svgR.top + iy * rec.scale,
     };
   }
 

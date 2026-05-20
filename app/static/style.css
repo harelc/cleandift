@@ -38,7 +38,9 @@ main#viewer {
   display: grid; grid-template-columns: 1fr auto 1fr;
   gap: 0; padding: 16px;
   align-items: start;
+  min-height: 200px;
 }
+main#viewer > svg#lines { grid-column: 1 / -1; grid-row: 1; }
 .pane { min-width: 0; }
 .paneTitle {
   font-size: 12px; color: #93a0b4; margin-bottom: 6px; display: flex; justify-content: space-between;
