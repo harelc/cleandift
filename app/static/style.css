@@ -55,6 +55,29 @@ main#viewer > svg#lines { grid-column: 1 / -1; grid-row: 1; }
   line-height: 0;
 }
 .canvasWrap canvas:first-child { display: block; cursor: crosshair; }
+.canvasWrap.empty {
+  min-height: 220px;
+  min-width: 220px;
+  display: flex; align-items: center; justify-content: center;
+  color: #6b7385;
+  font-size: 13px;
+  line-height: 1.4;
+  text-align: center;
+  padding: 12px;
+}
+.canvasWrap.dragover {
+  outline: 2px dashed #4474f5;
+  outline-offset: -4px;
+  background: #142036;
+}
+.canvasWrap .dropHint { display: none; }
+.canvasWrap.empty .dropHint {
+  display: block;
+  color: #6b7385;
+  font-size: 13px;
+  text-align: center;
+  padding: 12px;
+}
 .canvasWrap canvas:nth-child(2) {
   position: absolute; top: 0; left: 0; pointer-events: none;
 }

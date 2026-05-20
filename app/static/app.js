@@ -101,6 +101,7 @@ function loadImg(url) {
 
 async function onFile(which, file) {
   if (!file) return;
+  if (!file.type.startsWith("image/")) { log(`not an image: ${file.name}`, "err"); return; }
   log(`uploading ${which}: ${file.name}`);
   try {
     const rec = await uploadFile(file);
@@ -112,6 +113,7 @@ async function onFile(which, file) {
     overlay.height = canvas.height;
     rec.canvas = canvas;
     rec.overlay = overlay;
+    $(which === "src" ? "srcWrap" : "tgtWrap").classList.remove("empty");
     clearOverlays();
     requestAnimationFrame(relayoutCanvases);
     log(`${which} ready ${rec.w}x${rec.h}`, "ok");
@@ -356,6 +358,34 @@ $("swapBtn").addEventListener("click", () => {
 });
 window.addEventListener("resize", () => requestAnimationFrame(relayoutCanvases));
 
+function setupDnD() {
+  for (const which of ["src", "tgt"]) {
+    const el = $(which === "src" ? "srcWrap" : "tgtWrap");
+    // show placeholder text via ::before pseudo? Easier: set innerText on empty.
+    // Inject a small label element when empty.
+    const hint = document.createElement("div");
+    hint.className = "dropHint";
+    hint.textContent = el.dataset.emptyText || "drop image here";
+    el.prepend(hint);
+
+    el.addEventListener("dragenter", (e) => { e.preventDefault(); el.classList.add("dragover"); });
+    el.addEventListener("dragover", (e) => { e.preventDefault(); e.dataTransfer.dropEffect = "copy"; });
+    el.addEventListener("dragleave", (e) => {
+      if (e.target === el) el.classList.remove("dragover");
+    });
+    el.addEventListener("drop", (e) => {
+      e.preventDefault();
+      el.classList.remove("dragover");
+      const f = e.dataTransfer.files[0];
+      if (f) onFile(which, f);
+    });
+  }
+  // Prevent the browser from navigating if user drops outside a pane.
+  window.addEventListener("dragover", (e) => e.preventDefault());
+  window.addEventListener("drop", (e) => e.preventDefault());
+}
+
 setupCanvasClicks();
+setupDnD();
 loadHealth();
 setInterval(loadHealth, 5000);

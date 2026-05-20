@@ -50,7 +50,7 @@
 <main id="viewer">
   <div class="pane">
     <div class="paneTitle">Source <span class="hint">click to find its match →</span></div>
-    <div class="canvasWrap" id="srcWrap">
+    <div class="canvasWrap empty" id="srcWrap" data-which="src" data-empty-text="drop a source image here, or use the file picker above">
       <canvas id="srcCanvas"></canvas>
       <canvas id="srcOverlay"></canvas>
     </div>
@@ -58,7 +58,7 @@
   <svg id="lines"></svg>
   <div class="pane">
     <div class="paneTitle">Target <span class="hint">← click to find its match</span></div>
-    <div class="canvasWrap" id="tgtWrap">
+    <div class="canvasWrap empty" id="tgtWrap" data-which="tgt" data-empty-text="drop a target image here">
       <canvas id="tgtCanvas"></canvas>
       <canvas id="tgtOverlay"></canvas>
     </div>
