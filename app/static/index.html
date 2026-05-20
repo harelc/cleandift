@@ -32,11 +32,18 @@
 
     <h3>Feature extraction</h3>
     <ul>
-      <li>Each uploaded image is resized to <code>768 × 768</code> and pushed through the model.</li>
+      <li>Each uploaded image is resized to a chosen square (default <code>768 × 768</code>) and
+        pushed through the model.</li>
       <li>We read the <strong><code>us6</code></strong> activation by default — a
-        <code>(1280, 48, 48)</code> tensor on GPU. That's a 1280-D semantic descriptor for each
-        of 2304 spatial cells, each roughly covering a <code>16 × 16</code> patch of the input.</li>
-      <li>Features are computed once per (image, caption, feature-key) and cached on the GPU.</li>
+        <code>(1280, h, w)</code> tensor on GPU, where <code>h = w = input / 16</code>.
+        That's a 1280-D semantic descriptor for each spatial cell, each roughly covering a
+        <code>16 × 16</code> patch of the input.</li>
+      <li>The UNet is fully convolutional in the spatial axes (no positional embeddings),
+        so the <strong>Resolution</strong> dropdown lets you trade compute for a denser
+        feature grid: <code>768 → 48×48</code>, <code>1024 → 64×64</code>,
+        <code>1280 → 80×80</code>, <code>1536 → 96×96</code>. SD&nbsp;2.1 was trained at
+        768², so feature quality is best there; it degrades gradually above ~1280.</li>
+      <li>Features are cached on the GPU per (image, caption, feature-key, resolution).</li>
     </ul>
 
     <h3>Click-to-match</h3>
