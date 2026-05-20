@@ -114,7 +114,14 @@ async function onFile(which, file) {
     rec.canvas = canvas;
     rec.overlay = overlay;
     $(which === "src" ? "srcWrap" : "tgtWrap").classList.remove("empty");
+    // Apply a conservative size up-front so the canvas doesn't render at its natural pixel
+    // dimensions and blow out the grid before relayout runs.
+    for (const c of [canvas, overlay]) {
+      c.style.width = "100px";
+      c.style.height = "100px";
+    }
     clearOverlays();
+    relayoutCanvases();
     requestAnimationFrame(relayoutCanvases);
     log(`${which} ready ${rec.w}x${rec.h}`, "ok");
   } catch (e) {

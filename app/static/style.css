@@ -54,6 +54,11 @@ main#viewer > svg#lines { grid-column: 1 / -1; grid-row: 1; }
   border-radius: 6px;
   line-height: 0;
 }
+.canvasWrap { max-width: 100%; }
+.canvasWrap canvas {
+  /* Safety net before JS relayout assigns explicit pixel dims. */
+  max-width: 100%;
+}
 .canvasWrap canvas:first-child { display: block; cursor: crosshair; }
 .canvasWrap.empty {
   min-height: 220px;
