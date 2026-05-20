@@ -313,9 +313,8 @@ async function runTopN() {
     log(`top-N done in ${(performance.now()-t0).toFixed(0)}ms · ${r.matches.length} matches`, "ok");
     state.topMatches = r.matches;
     state.clickPoints = [];
-    clearOverlayCanvases();
-    redrawDots();
-    renderLines();
+    // updateMaskOverlay clears overlays, redraws mask (if enabled), then dots.
+    await updateMaskOverlay();
   } catch (e) {
     log(`top-N failed: ${e.message}`, "err");
   } finally {
