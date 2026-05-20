@@ -57,8 +57,10 @@ function dispScale(rec) {
 function relayoutCanvases() {
   // Shared scale: both canvases render at the same px-per-natural-px factor.
   // Fill the larger of the two panes; cap height at most of the viewport.
-  const paneEls = [$("srcWrap").parentElement, $("tgtWrap").parentElement];
-  const paneW = Math.max(40, Math.min(...paneEls.map((p) => p.clientWidth)) - 4);
+  // Use the viewer's overall width (independent of pane content) so we don't loop.
+  const viewer = $("viewer");
+  const viewerW = viewer.clientWidth - 32; // padding 16+16
+  const paneW = Math.max(120, Math.floor(viewerW / 2) - 8);
   const maxH = Math.max(240, window.innerHeight * 0.82);
   let maxNW = 0, maxNH = 0;
   for (const k of ["src", "tgt"]) if (state[k]) {
