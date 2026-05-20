@@ -48,8 +48,10 @@ main#viewer > svg#lines { grid-column: 1 / -1; grid-row: 1; }
 .paneTitle .hint { color: #6b7385; }
 .canvasWrap {
   position: relative;
-  display: block;
+  display: grid;
+  place-items: center;
   width: 100%;
+  aspect-ratio: 4 / 3;
   background: #0a0c11;
   border: 1px solid #232733;
   border-radius: 6px;
@@ -57,12 +59,13 @@ main#viewer > svg#lines { grid-column: 1 / -1; grid-row: 1; }
 }
 .canvasWrap canvas {
   display: block;
-  width: 100%;
+  grid-area: 1 / 1;
+  max-width: 100%;
+  max-height: 100%;
+  width: auto;
   height: auto;
 }
-.canvasWrap canvas:nth-child(2) {
-  position: absolute; inset: 0; pointer-events: none;
-}
+.canvasWrap canvas:nth-child(2) { pointer-events: none; }
 .canvasWrap canvas:first-child { cursor: crosshair; }
 
 svg#lines {

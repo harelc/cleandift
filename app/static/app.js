@@ -316,7 +316,12 @@ $("mode").addEventListener("change", () => {
 });
 $("runBtn").addEventListener("click", () => {
   if ($("mode").value === "top") runTopN();
-  else { clearOverlays(); log("cleared. click an image to match."); }
+  else { clearOverlays(); renderLines(); log("ready — click an image to match."); }
+});
+$("clearBtn").addEventListener("click", () => {
+  clearOverlays();
+  renderLines();
+  log("cleared overlays");
 });
 $("swapBtn").addEventListener("click", () => {
   const a = state.src, b = state.tgt;
