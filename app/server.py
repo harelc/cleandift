@@ -146,22 +146,27 @@ def load_model():
 # Feature extraction helpers
 # ---------------------------------------------------------------------------
 
-def _preprocess(pil: Image.Image) -> torch.Tensor:
-    img = pil.convert("RGB").resize((IMAGE_SIZE, IMAGE_SIZE), Image.BICUBIC)
+def _preprocess(pil: Image.Image, size: int) -> torch.Tensor:
+    img = pil.convert("RGB").resize((size, size), Image.BICUBIC)
     t = to_tensor(img)[None].to(DEVICE) * 2 - 1
     return t.to(DTYPE)
 
 
-def compute_features(rec: ImageRecord, caption: str, feat_key: str) -> torch.Tensor:
-    key = (caption, feat_key)
+def compute_features(rec: ImageRecord, caption: str, feat_key: str,
+                     image_size: int | None = None) -> torch.Tensor:
+    size = int(image_size or IMAGE_SIZE)
+    # Snap to a UNet-friendly multiple of 64 (latent multiple of 8).
+    size = max(256, (size // 64) * 64)
+    key = (caption, feat_key, size)
     if key in rec.features:
         return rec.features[key]
     model = load_model()
-    x = _preprocess(rec.pil)
+    x = _preprocess(rec.pil, size)
     with torch.no_grad():
         feats = model.get_features(x, [caption], t=None, feat_key=feat_key)
-    # feats: [1, D, h, w] bf16 on GPU. Keep on GPU; small enough.
     rec.features[key] = feats
+    log.info("features %s caption=%r feat=%s size=%d -> %s", rec.image_id,
+             caption, feat_key, size, list(feats.shape))
     return feats
 
 
@@ -185,6 +190,7 @@ class MatchRequest(BaseModel):
     heatmap_size: int = 256
     restrict_to_salient: bool = False
     salient_threshold: float = 0.5
+    image_size: int | None = None  # override CLEANDIFT_IMG_SIZE
 
 
 class KeypointCorrespondenceRequest(BaseModel):
@@ -196,6 +202,7 @@ class KeypointCorrespondenceRequest(BaseModel):
     restrict_to_salient: bool = False
     salient_threshold: float = 0.5
     min_score: float = 0.3
+    image_size: int | None = None
 
 
 class TopMatchesRequest(BaseModel):
@@ -207,7 +214,8 @@ class TopMatchesRequest(BaseModel):
     min_similarity: float = 0.0
     nms_radius_frac: float = 0.06  # fraction of min(src_w, src_h)
     restrict_to_salient: bool = False
-    salient_threshold: float = 0.5  # 0-1, applied to normalized mask
+    salient_threshold: float = 0.5
+    image_size: int | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -308,8 +316,8 @@ async def match(req: MatchRequest):
     if not src or not tgt:
         raise HTTPException(404, "unknown image_id")
 
-    src_feats = compute_features(src, req.caption, req.feat_key)
-    tgt_feats = compute_features(tgt, req.caption, req.feat_key)
+    src_feats = compute_features(src, req.caption, req.feat_key, req.image_size)
+    tgt_feats = compute_features(tgt, req.caption, req.feat_key, req.image_size)
 
     # Map click (in client's src image coords) to feature-grid coords
     _, _, fhs, fws = src_feats.shape
@@ -449,8 +457,8 @@ async def top_matches(req: TopMatchesRequest):
     tgt = IMAGES.get(req.tgt_id)
     if not src or not tgt:
         raise HTTPException(404, "unknown image_id")
-    src_feats = compute_features(src, req.caption, req.feat_key)
-    tgt_feats = compute_features(tgt, req.caption, req.feat_key)
+    src_feats = compute_features(src, req.caption, req.feat_key, req.image_size)
+    tgt_feats = compute_features(tgt, req.caption, req.feat_key, req.image_size)
 
     src_mask = tgt_mask = None
     if req.restrict_to_salient:
@@ -493,8 +501,8 @@ async def keypoint_correspondences(req: KeypointCorrespondenceRequest):
     if not kpts:
         return {"matches": [], "scheme": req.scheme, "n_keypoints": 0}
 
-    src_feats = compute_features(src, req.caption, req.feat_key)
-    tgt_feats = compute_features(tgt, req.caption, req.feat_key)
+    src_feats = compute_features(src, req.caption, req.feat_key, req.image_size)
+    tgt_feats = compute_features(tgt, req.caption, req.feat_key, req.image_size)
     _, _, fhs, fws = src_feats.shape
     _, _, fht, fwt = tgt_feats.shape
 

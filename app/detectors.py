@@ -76,18 +76,63 @@ def get_edges(scheme: str) -> list[tuple[int, int]]:
     if scheme == "dwpose_face":
         return list(DLIB68_FACE_EDGES)
     if scheme == "mediapipe_face":
-        # Pull contour edges from mediapipe's canonical face mesh topology.
-        import mediapipe as mp
         edges = set()
-        for a, b in mp.solutions.face_mesh.FACEMESH_CONTOURS:
+        for a, b in MEDIAPIPE_FACE_CONTOURS:
             edges.add((min(a, b), max(a, b)))
         return sorted(edges)
     return []
 
+MP_TASK_URL = (
+    "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/"
+    "float16/1/face_landmarker.task"
+)
+
+# Canonical MediaPipe FaceMesh contour edges (pasted from mediapipe's
+# python/solutions/face_mesh_connections.py, since 0.10.35 ships only the
+# Tasks API and the `solutions` namespace is gone).
+_MP_LIPS = (
+    (61, 146), (146, 91), (91, 181), (181, 84), (84, 17), (17, 314), (314, 405),
+    (405, 321), (321, 375), (375, 291), (61, 185), (185, 40), (40, 39), (39, 37),
+    (37, 0), (0, 267), (267, 269), (269, 270), (270, 409), (409, 291), (78, 95),
+    (95, 88), (88, 178), (178, 87), (87, 14), (14, 317), (317, 402), (402, 318),
+    (318, 324), (324, 308), (78, 191), (191, 80), (80, 81), (81, 82), (82, 13),
+    (13, 312), (312, 311), (311, 310), (310, 415), (415, 308),
+)
+_MP_LEFT_EYE = (
+    (263, 249), (249, 390), (390, 373), (373, 374), (374, 380), (380, 381),
+    (381, 382), (382, 362), (263, 466), (466, 388), (388, 387), (387, 386),
+    (386, 385), (385, 384), (384, 398), (398, 362),
+)
+_MP_LEFT_EYEBROW = (
+    (276, 283), (283, 282), (282, 295), (295, 285), (300, 293), (293, 334),
+    (334, 296), (296, 336),
+)
+_MP_RIGHT_EYE = (
+    (33, 7), (7, 163), (163, 144), (144, 145), (145, 153), (153, 154),
+    (154, 155), (155, 133), (33, 246), (246, 161), (161, 160), (160, 159),
+    (159, 158), (158, 157), (157, 173), (173, 133),
+)
+_MP_RIGHT_EYEBROW = (
+    (46, 53), (53, 52), (52, 65), (65, 55), (70, 63), (63, 105), (105, 66),
+    (66, 107),
+)
+_MP_FACE_OVAL = (
+    (10, 338), (338, 297), (297, 332), (332, 284), (284, 251), (251, 389),
+    (389, 356), (356, 454), (454, 323), (323, 361), (361, 288), (288, 397),
+    (397, 365), (365, 379), (379, 378), (378, 400), (400, 377), (377, 152),
+    (152, 148), (148, 176), (176, 149), (149, 150), (150, 136), (136, 172),
+    (172, 58), (58, 132), (132, 93), (93, 234), (234, 127), (127, 162),
+    (162, 21), (21, 54), (54, 103), (103, 67), (67, 109), (109, 10),
+)
+MEDIAPIPE_FACE_CONTOURS = (
+    list(_MP_LIPS) + list(_MP_LEFT_EYE) + list(_MP_LEFT_EYEBROW)
+    + list(_MP_RIGHT_EYE) + list(_MP_RIGHT_EYEBROW) + list(_MP_FACE_OVAL)
+)
+
 # Lazy globals — each detector is initialized on first use.
 _WHOLEBODY = None
 _WHOLEBODY_LOCK = Lock()
-_MP_FACEMESH = None
+_MP_FACE_LANDMARKER = None
 _MP_LOCK = Lock()
 
 
@@ -113,22 +158,40 @@ def _get_wholebody():
     return _WHOLEBODY
 
 
-def _get_facemesh():
-    global _MP_FACEMESH
-    if _MP_FACEMESH is not None:
-        return _MP_FACEMESH
-    with _MP_LOCK:
-        if _MP_FACEMESH is None:
-            import mediapipe as mp
+def _mp_task_file() -> str:
+    """Return local path to face_landmarker.task, downloading if missing."""
+    cache = os.path.expanduser(os.environ.get(
+        "CLEANDIFT_MP_CACHE", "~/.cache/mediapipe_tasks"))
+    os.makedirs(cache, exist_ok=True)
+    dest = os.path.join(cache, "face_landmarker.task")
+    if not os.path.exists(dest):
+        import urllib.request
 
-            log.info("loading mediapipe FaceMesh")
-            _MP_FACEMESH = mp.solutions.face_mesh.FaceMesh(
-                static_image_mode=True,
-                max_num_faces=1,
-                refine_landmarks=True,
-                min_detection_confidence=0.5,
+        log.info("downloading %s -> %s", MP_TASK_URL, dest)
+        urllib.request.urlretrieve(MP_TASK_URL, dest)
+    return dest
+
+
+def _get_facemesh():
+    global _MP_FACE_LANDMARKER
+    if _MP_FACE_LANDMARKER is not None:
+        return _MP_FACE_LANDMARKER
+    with _MP_LOCK:
+        if _MP_FACE_LANDMARKER is None:
+            from mediapipe.tasks import python as mp_python
+            from mediapipe.tasks.python import vision as mp_vision
+
+            log.info("loading mediapipe FaceLandmarker (tasks API)")
+            base = mp_python.BaseOptions(model_asset_path=_mp_task_file())
+            opts = mp_vision.FaceLandmarkerOptions(
+                base_options=base,
+                running_mode=mp_vision.RunningMode.IMAGE,
+                num_faces=1,
+                output_face_blendshapes=False,
+                output_facial_transformation_matrixes=False,
             )
-    return _MP_FACEMESH
+            _MP_FACE_LANDMARKER = mp_vision.FaceLandmarker.create_from_options(opts)
+    return _MP_FACE_LANDMARKER
 
 
 def detect_keypoints(
@@ -167,12 +230,15 @@ def detect_keypoints(
         return out
 
     if scheme == "mediapipe_face":
+        import mediapipe as mp
+
         fm = _get_facemesh()
-        # mediapipe expects RGB uint8
-        r = fm.process(img)
-        if not r.multi_face_landmarks:
+        # Tasks API expects a mediapipe.Image wrapper.
+        mp_img = mp.Image(image_format=mp.ImageFormat.SRGB, data=img)
+        r = fm.detect(mp_img)
+        if not r.face_landmarks:
             return []
-        lms = r.multi_face_landmarks[0].landmark
+        lms = r.face_landmarks[0]  # list of NormalizedLandmark
         return [
             {"idx": i, "x": l.x * w, "y": l.y * h, "name": f"m{i}", "score": 1.0}
             for i, l in enumerate(lms)

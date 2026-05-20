@@ -107,6 +107,15 @@
     Caption
     <input type="text" id="caption" value="" placeholder='e.g. "a photo of a dog"' />
   </label>
+  <label title="Higher = denser feature grid, ~1/16 of input resolution. SD2.1 was trained at 768; features degrade above ~1280.">
+    Resolution
+    <select id="imageSize">
+      <option value="">default (768)</option>
+      <option value="1024">1024 (64×64 grid)</option>
+      <option value="1280">1280 (80×80 grid)</option>
+      <option value="1536">1536 (96×96 grid)</option>
+    </select>
+  </label>
   <label>
     Feature
     <select id="featKey">

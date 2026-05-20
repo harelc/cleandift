@@ -1,5 +1,9 @@
 // CleanDIFT interactive correspondence frontend
 const $ = (id) => document.getElementById(id);
+function imageSizeParam() {
+  const v = ($("imageSize") && $("imageSize").value) || "";
+  return v ? parseInt(v, 10) : null;
+}
 
 const state = {
   src: null, // {id, w, h, img}
@@ -231,6 +235,7 @@ async function handleCanvasClick(which, ev) {
         return_heatmap: $("showHeatmap").checked,
         heatmap_size: 256,
         restrict_to_salient: $("restrictSalient").checked,
+        image_size: imageSizeParam(),
       }),
     });
     log(`match in ${(performance.now() - t0).toFixed(0)}ms · sim=${r.similarity.toFixed(3)}`, "ok");
@@ -358,6 +363,7 @@ async function runTopN() {
         n, caption: $("caption").value, feat_key: $("featKey").value,
         min_similarity: 0.0, nms_radius_frac: nmsR,
         restrict_to_salient: restrict,
+        image_size: imageSizeParam(),
       }),
     });
     log(`top-N done in ${(performance.now()-t0).toFixed(0)}ms · ${r.matches.length} matches`, "ok");
@@ -440,6 +446,7 @@ async function runKeypoints() {
         caption: $("caption").value,
         feat_key: $("featKey").value,
         restrict_to_salient: $("restrictSalient").checked,
+        image_size: imageSizeParam(),
       }),
     });
     log(`keypoints done in ${(performance.now()-t0).toFixed(0)}ms · ${r.n_keypoints} detected · ${r.matches.length} matched`, "ok");
