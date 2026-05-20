@@ -53,8 +53,9 @@ function relayoutCanvases() {
   // Fill the larger of the two panes; cap height at most of the viewport.
   // Use the viewer's overall width (independent of pane content) so we don't loop.
   const viewer = $("viewer");
-  const viewerW = viewer.clientWidth - 32; // padding 16+16
-  const paneW = Math.max(120, Math.floor(viewerW / 2) - 8);
+  // Available width: viewer minus its 32px padding and the 16px flex gap between panes.
+  const viewerW = viewer.clientWidth - 32 - 16;
+  const paneW = Math.max(120, Math.floor(viewerW / 2));
   const maxH = Math.max(240, window.innerHeight * 0.82);
   let maxNW = 0, maxNH = 0;
   for (const k of ["src", "tgt"]) if (state[k]) {
