@@ -176,12 +176,26 @@ function drawHeatmapOnTarget(dataUrl) {
   });
 }
 
+const SVG_NS = "http://www.w3.org/2000/svg";
+
+function ensureArrowMarker(svg) {
+  if (svg.querySelector("#arrowMarker")) return;
+  const defs = document.createElementNS(SVG_NS, "defs");
+  defs.innerHTML = `
+    <marker id="arrowMarker" viewBox="0 0 10 10" refX="9" refY="5"
+            markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="currentColor" />
+    </marker>`;
+  svg.prepend(defs);
+}
+
 function renderLines() {
   const svg = $("lines");
   svg.innerHTML = "";
   const svgR = svg.getBoundingClientRect();
   svg.setAttribute("viewBox", `0 0 ${svgR.width} ${svgR.height}`);
   svg.setAttribute("preserveAspectRatio", "none");
+  ensureArrowMarker(svg);
 
   function paneCoord(rec, ix, iy) {
     const r = rec.imgEl.getBoundingClientRect();
@@ -189,25 +203,36 @@ function renderLines() {
     return { x: r.left - svgR.left + ix * s, y: r.top - svgR.top + iy * s };
   }
 
-  const drawPair = (a, b, color) => {
-    const l = document.createElementNS("http://www.w3.org/2000/svg", "line");
+  const drawPair = (a, b, color, withArrow = false) => {
+    const l = document.createElementNS(SVG_NS, "line");
     l.setAttribute("x1", a.x); l.setAttribute("y1", a.y);
     l.setAttribute("x2", b.x); l.setAttribute("y2", b.y);
     l.setAttribute("stroke", color);
+    l.setAttribute("color", color); // marker uses currentColor
+    if (withArrow) l.setAttribute("marker-end", "url(#arrowMarker)");
     svg.appendChild(l);
   };
+
+  const showArrows = $("showArrows") ? $("showArrows").checked : true;
 
   state.clickPoints.forEach((p, i) => {
     if (!p.tgtPt) return;
     const a = paneCoord(state.src, p.srcPt.x, p.srcPt.y);
     const b = paneCoord(state.tgt, p.tgtPt.x, p.tgtPt.y);
-    drawPair(a, b, palette[i % palette.length]);
+    drawPair(a, b, palette[i % palette.length], showArrows);
   });
   state.topMatches.forEach((m, i) => {
     const a = paneCoord(state.src, m.src_x, m.src_y);
     const b = paneCoord(state.tgt, m.tgt_x, m.tgt_y);
-    drawPair(a, b, palette[i % palette.length]);
+    drawPair(a, b, palette[i % palette.length], showArrows);
   });
+  if (state.keypoint && showArrows) {
+    state.keypoint.matches.forEach((m, i) => {
+      const a = paneCoord(state.src, m.src_x, m.src_y);
+      const b = paneCoord(state.tgt, m.tgt_x, m.tgt_y);
+      drawPair(a, b, palette[i % palette.length], true);
+    });
+  }
 }
 
 async function handleCanvasClick(which, ev) {
@@ -506,6 +531,7 @@ $("clearBtn").addEventListener("click", () => {
   log("cleared overlays");
 });
 $("showMask").addEventListener("change", () => updateMaskOverlay());
+$("showArrows").addEventListener("change", () => renderLines());
 $("restrictSalient").addEventListener("change", () => {
   if ($("restrictSalient").checked) $("showMask").checked = true;
   updateMaskOverlay();
