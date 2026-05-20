@@ -298,7 +298,8 @@ async function runTopN() {
   try {
     const n = Math.max(1, parseInt($("topN").value || "12", 10));
     const restrict = $("restrictSalient").checked;
-    log(`computing top ${n} mutual matches${restrict ? " (salient only)" : ""}…`);
+    const nmsR = parseFloat($("nmsRadius").value);
+    log(`computing top ${n} mutual matches${restrict ? " (salient only)" : ""} · nms=${nmsR.toFixed(3)}…`);
     const t0 = performance.now();
     const r = await api("/api/top_matches", {
       method: "POST",
@@ -306,7 +307,7 @@ async function runTopN() {
       body: JSON.stringify({
         src_id: state.src.id, tgt_id: state.tgt.id,
         n, caption: $("caption").value, feat_key: $("featKey").value,
-        min_similarity: 0.0, nms_radius_frac: 0.06,
+        min_similarity: 0.0, nms_radius_frac: nmsR,
         restrict_to_salient: restrict,
       }),
     });
@@ -373,6 +374,9 @@ function setupCanvasClicks() {
 $("srcFile").addEventListener("change", (e) => onFile("src", e.target.files[0]));
 $("tgtFile").addEventListener("change", (e) => onFile("tgt", e.target.files[0]));
 $("topBtn").addEventListener("click", () => runTopN());
+$("nmsRadius").addEventListener("input", () => {
+  $("nmsRadiusVal").textContent = parseFloat($("nmsRadius").value).toFixed(3);
+});
 $("clearBtn").addEventListener("click", () => {
   clearOverlays();
   renderLines();
