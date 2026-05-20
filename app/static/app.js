@@ -297,7 +297,8 @@ async function runTopN() {
   state.busy = true; $("topBtn").disabled = true;
   try {
     const n = Math.max(1, parseInt($("topN").value || "12", 10));
-    log(`computing top ${n} mutual matches…`);
+    const restrict = $("restrictSalient").checked;
+    log(`computing top ${n} mutual matches${restrict ? " (salient only)" : ""}…`);
     const t0 = performance.now();
     const r = await api("/api/top_matches", {
       method: "POST",
@@ -306,6 +307,7 @@ async function runTopN() {
         src_id: state.src.id, tgt_id: state.tgt.id,
         n, caption: $("caption").value, feat_key: $("featKey").value,
         min_similarity: 0.0, nms_radius_frac: 0.06,
+        restrict_to_salient: restrict,
       }),
     });
     log(`top-N done in ${(performance.now()-t0).toFixed(0)}ms · ${r.matches.length} matches`, "ok");
@@ -321,6 +323,49 @@ async function runTopN() {
   }
 }
 
+async function updateMaskOverlay() {
+  const show = $("showMask").checked;
+  for (const k of ["src", "tgt"]) {
+    const rec = state[k];
+    if (!rec) continue;
+    const ctx = rec.overlay.getContext("2d");
+    // Repaint dots first (clears any prior mask).
+    ctx.clearRect(0, 0, rec.overlay.width, rec.overlay.height);
+    if (show) {
+      try {
+        if (!rec.maskImg) {
+          log(`fetching salient mask for ${k}…`);
+          const img = new Image();
+          img.src = `/api/saliency/${rec.id}?ts=${Date.now()}`;
+          await new Promise((res, rej) => { img.onload = res; img.onerror = rej; });
+          rec.maskImg = img;
+        }
+        // Draw mask in red with the mask itself as the alpha channel.
+        const off = document.createElement("canvas");
+        off.width = rec.maskImg.naturalWidth;
+        off.height = rec.maskImg.naturalHeight;
+        const octx = off.getContext("2d");
+        octx.drawImage(rec.maskImg, 0, 0);
+        const data = octx.getImageData(0, 0, off.width, off.height);
+        // The mask is grayscale; use luminance as alpha and tint blue-green.
+        for (let i = 0; i < data.data.length; i += 4) {
+          const v = data.data[i];
+          data.data[i] = 32;       // R
+          data.data[i + 1] = 220;  // G
+          data.data[i + 2] = 180;  // B
+          data.data[i + 3] = Math.round(v * 0.45); // A (semi-transparent)
+        }
+        octx.putImageData(data, 0, 0);
+        ctx.drawImage(off, 0, 0, rec.overlay.width, rec.overlay.height);
+      } catch (e) {
+        log(`saliency failed for ${k}: ${e.message}`, "err");
+      }
+    }
+  }
+  redrawDots();
+  renderLines();
+}
+
 function setupCanvasClicks() {
   $("srcImg").addEventListener("click", (e) => handleCanvasClick("src", e));
   $("tgtImg").addEventListener("click", (e) => handleCanvasClick("tgt", e));
@@ -333,6 +378,11 @@ $("clearBtn").addEventListener("click", () => {
   clearOverlays();
   renderLines();
   log("cleared overlays");
+});
+$("showMask").addEventListener("change", () => updateMaskOverlay());
+$("restrictSalient").addEventListener("change", () => {
+  if ($("restrictSalient").checked) $("showMask").checked = true;
+  updateMaskOverlay();
 });
 $("swapBtn").addEventListener("click", () => {
   const a = state.src, b = state.tgt;

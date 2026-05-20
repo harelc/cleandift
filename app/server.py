@@ -70,10 +70,44 @@ class ImageRecord:
     height: int
     # cache features keyed by (caption, feat_key) -> tensor [1, D, h, w] on GPU bf16
     features: dict = field(default_factory=dict)
+    # cached saliency mask (PIL 'L' at natural size), None until computed
+    saliency: Image.Image | None = None
 
 
 IMAGES: dict[str, ImageRecord] = {}
 IMAGES_LOCK = Lock()
+
+# Lazy rembg session for salient-object/foreground detection.
+_REMBG_SESSION = None
+_REMBG_LOCK = Lock()
+
+
+def _rembg_session():
+    global _REMBG_SESSION
+    if _REMBG_SESSION is not None:
+        return _REMBG_SESSION
+    with _REMBG_LOCK:
+        if _REMBG_SESSION is None:
+            from rembg import new_session  # local import: heavy
+            model = os.environ.get("CLEANDIFT_SALIENCY", "isnet-general-use")
+            log.info("loading rembg session: %s", model)
+            _REMBG_SESSION = new_session(model)
+    return _REMBG_SESSION
+
+
+def compute_saliency(rec: ImageRecord) -> Image.Image:
+    if rec.saliency is not None:
+        return rec.saliency
+    from rembg import remove
+
+    sess = _rembg_session()
+    t0 = time.time()
+    mask = remove(rec.pil, session=sess, only_mask=True, post_process_mask=True)
+    if mask.mode != "L":
+        mask = mask.convert("L")
+    rec.saliency = mask
+    log.info("saliency %s in %.2fs", rec.image_id, time.time() - t0)
+    return mask
 
 
 def load_model():
@@ -153,6 +187,8 @@ class TopMatchesRequest(BaseModel):
     feat_key: str = FEAT_KEY_DEFAULT
     min_similarity: float = 0.0
     nms_radius_frac: float = 0.06  # fraction of min(src_w, src_h)
+    restrict_to_salient: bool = False
+    salient_threshold: float = 0.5  # 0-1, applied to normalized mask
 
 
 # ---------------------------------------------------------------------------
@@ -294,13 +330,33 @@ async def match(req: MatchRequest):
     return out
 
 
-def _top_mutual_matches(src_feats, tgt_feats, n, min_sim, nms_radius_frac):
-    """Compute top-N mutual nearest-neighbor matches with NMS in source grid."""
+def _mask_to_feat_grid(mask_pil: Image.Image, h: int, w: int, threshold: float) -> torch.Tensor:
+    """Resize a PIL saliency mask to (h,w) and threshold to bool."""
+    m = mask_pil.resize((w, h), Image.BILINEAR)
+    arr = np.asarray(m, dtype=np.float32) / 255.0
+    return torch.from_numpy(arr >= threshold).to("cuda" if torch.cuda.is_available() else "cpu")
+
+
+def _top_mutual_matches(src_feats, tgt_feats, n, min_sim, nms_radius_frac,
+                        src_mask: torch.Tensor | None = None,
+                        tgt_mask: torch.Tensor | None = None):
+    """Compute top-N mutual nearest-neighbor matches with NMS in source grid.
+
+    Optional boolean masks (feature-grid sized) restrict matches: a candidate
+    is kept only if its source location is in src_mask AND its best target
+    location is in tgt_mask.
+    """
     _, _, hs, ws = src_feats.shape
     _, _, ht, wt = tgt_feats.shape
 
     sims = _cos_sim_matrix(src_feats, tgt_feats)  # [Ns, Nt]
     Ns, Nt = sims.shape
+
+    # If we have a target mask, suppress similarities to non-salient target
+    # locations so argmax never lands there.
+    if tgt_mask is not None:
+        flat_tgt = tgt_mask.view(-1)
+        sims = sims.masked_fill(~flat_tgt[None, :], -1.0)
 
     src_best = sims.argmax(dim=1)  # [Ns] -> tgt idx
     src_best_val = sims.gather(1, src_best[:, None]).squeeze(1)
@@ -309,6 +365,9 @@ def _top_mutual_matches(src_feats, tgt_feats, n, min_sim, nms_radius_frac):
     src_idx = torch.arange(Ns, device=sims.device)
     mutual_mask = tgt_best[src_best] == src_idx
     mutual_mask &= src_best_val >= min_sim
+
+    if src_mask is not None:
+        mutual_mask &= src_mask.view(-1)
 
     cand_src = src_idx[mutual_mask]
     cand_tgt = src_best[mutual_mask]
@@ -352,8 +411,17 @@ async def top_matches(req: TopMatchesRequest):
         raise HTTPException(404, "unknown image_id")
     src_feats = compute_features(src, req.caption, req.feat_key)
     tgt_feats = compute_features(tgt, req.caption, req.feat_key)
+
+    src_mask = tgt_mask = None
+    if req.restrict_to_salient:
+        _, _, hs, ws = src_feats.shape
+        _, _, ht, wt = tgt_feats.shape
+        src_mask = _mask_to_feat_grid(compute_saliency(src), hs, ws, req.salient_threshold)
+        tgt_mask = _mask_to_feat_grid(compute_saliency(tgt), ht, wt, req.salient_threshold)
+
     picks, (ws, hs), (wt, ht) = _top_mutual_matches(
-        src_feats, tgt_feats, req.n, req.min_similarity, req.nms_radius_frac
+        src_feats, tgt_feats, req.n, req.min_similarity, req.nms_radius_frac,
+        src_mask=src_mask, tgt_mask=tgt_mask,
     )
     # convert feat-grid coords to image coords
     out = []
@@ -370,6 +438,20 @@ async def top_matches(req: TopMatchesRequest):
         "src_size": [src.width, src.height],
         "tgt_size": [tgt.width, tgt.height],
     }
+
+
+@app.get("/api/saliency/{image_id}")
+async def get_saliency(image_id: str):
+    """Return the saliency mask as a PNG (grayscale, natural-image size)."""
+    from fastapi.responses import Response
+
+    rec = IMAGES.get(image_id)
+    if not rec:
+        raise HTTPException(404, "unknown image_id")
+    mask = compute_saliency(rec)
+    buf = io.BytesIO()
+    mask.save(buf, format="PNG")
+    return Response(buf.getvalue(), media_type="image/png")
 
 
 @app.get("/api/image/{image_id}")

@@ -42,6 +42,12 @@
   <label>
     N <input type="number" id="topN" value="12" min="1" max="200" style="width:4em" />
   </label>
+  <label>
+    <input type="checkbox" id="restrictSalient" /> Salient region only
+  </label>
+  <label>
+    <input type="checkbox" id="showMask" /> Show salient masks
+  </label>
   <button id="topBtn" title="Compute top-N mutual correspondences">Find top correspondences</button>
   <button id="clearBtn" title="Clear all dots, lines, and heatmaps">Clear</button>
   <button id="swapBtn" title="Swap source and target">⇄ Swap</button>
