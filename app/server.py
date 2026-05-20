@@ -102,11 +102,17 @@ def compute_saliency(rec: ImageRecord) -> Image.Image:
 
     sess = _rembg_session()
     t0 = time.time()
-    mask = remove(rec.pil, session=sess, only_mask=True, post_process_mask=True)
-    if mask.mode != "L":
-        mask = mask.convert("L")
+    # Downsample 2x on each axis for speed; the salient mask is coarse anyway.
+    small = rec.pil.resize((max(1, rec.pil.width // 2), max(1, rec.pil.height // 2)), Image.BILINEAR)
+    mask_small = remove(small, session=sess, only_mask=True, post_process_mask=True)
+    if mask_small.mode != "L":
+        mask_small = mask_small.convert("L")
+    # Upsample back to natural size for the cached mask (so frontend / feat-grid
+    # downsampling work as before).
+    mask = mask_small.resize((rec.pil.width, rec.pil.height), Image.BILINEAR)
     rec.saliency = mask
-    log.info("saliency %s in %.2fs", rec.image_id, time.time() - t0)
+    log.info("saliency %s in %.2fs (input %dx%d)", rec.image_id, time.time() - t0,
+             small.width, small.height)
     return mask
 
 
