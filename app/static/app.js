@@ -72,11 +72,10 @@ function relayoutCanvases() {
   const scale = Math.min(paneW / maxNW, maxH / maxNH, 3);
   for (const k of ["src", "tgt"]) if (state[k]) {
     const w = Math.round(state[k].img.naturalWidth * scale);
-    const h = Math.round(state[k].img.naturalHeight * scale);
-    for (const c of [state[k].canvas, state[k].overlay]) {
-      c.style.width = w + "px";
-      c.style.height = h + "px";
-    }
+    // Only set width on the main canvas; CSS `height: auto` keeps aspect correct.
+    state[k].canvas.style.width = w + "px";
+    state[k].canvas.style.height = ""; // let CSS auto apply
+    // Overlay is position:absolute; width:100%; height:100% — fills the main canvas.
   }
   redrawDots();
   renderLines();
@@ -114,12 +113,6 @@ async function onFile(which, file) {
     rec.canvas = canvas;
     rec.overlay = overlay;
     $(which === "src" ? "srcWrap" : "tgtWrap").classList.remove("empty");
-    // Apply a conservative size up-front so the canvas doesn't render at its natural pixel
-    // dimensions and blow out the grid before relayout runs.
-    for (const c of [canvas, overlay]) {
-      c.style.width = "100px";
-      c.style.height = "100px";
-    }
     clearOverlays();
     relayoutCanvases();
     requestAnimationFrame(relayoutCanvases);
