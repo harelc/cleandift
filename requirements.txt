@@ -9,3 +9,6 @@ torch>=2.1.0
 torchvision
 transformers
 tqdm
+rembg>=2.0.50
+rtmlib
+mediapipe

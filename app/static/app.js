@@ -7,6 +7,7 @@ const state = {
   busy: false,
   topMatches: [],          // array of {src_x, src_y, tgt_x, tgt_y, score}
   clickPoints: [],         // array of {srcPt:{x,y}, tgtPt:{x,y}, score, heatmap}
+  keypoint: null,          // {scheme, matches:[{idx,name,src_x,src_y,tgt_x,tgt_y}], edges:[[a,b],...]}
 };
 
 const palette = [
@@ -126,6 +127,7 @@ function clearOverlays() {
   $("lines").innerHTML = "";
   state.topMatches = [];
   state.clickPoints = [];
+  state.keypoint = null;
 }
 
 function imgToCanvas(rec, x, y) {
@@ -291,6 +293,52 @@ function redrawDots() {
     drawDot(state.src, m.src_x, m.src_y, color, i + 1);
     drawDot(state.tgt, m.tgt_x, m.tgt_y, color, i + 1);
   });
+  if (state.keypoint) drawKeypointOverlay();
+}
+
+function drawKeypointOverlay() {
+  const kp = state.keypoint;
+  if (!kp || !state.src || !state.tgt) return;
+  // Skeleton/contour lines first, then dots on top.
+  const byIdx = new Map(kp.matches.map((m) => [m.idx, m]));
+  for (const side of ["src", "tgt"]) {
+    const rec = state[side];
+    if (!rec) continue;
+    const ctx = rec.overlay.getContext("2d");
+    const s = 1 / Math.max(0.01, dispScale(rec));
+    ctx.lineWidth = 2 * s;
+    ctx.strokeStyle = side === "src" ? "rgba(255,255,255,0.85)" : "rgba(255,210,120,0.9)";
+    for (const [a, b] of kp.edges) {
+      const ma = byIdx.get(a), mb = byIdx.get(b);
+      if (!ma || !mb) continue;
+      const xa = side === "src" ? ma.src_x : ma.tgt_x;
+      const ya = side === "src" ? ma.src_y : ma.tgt_y;
+      const xb = side === "src" ? mb.src_x : mb.tgt_x;
+      const yb = side === "src" ? mb.src_y : mb.tgt_y;
+      ctx.beginPath();
+      ctx.moveTo(xa, ya);
+      ctx.lineTo(xb, yb);
+      ctx.stroke();
+    }
+  }
+  // Smaller dots than top-N — too many to use big numbered circles.
+  for (const side of ["src", "tgt"]) {
+    const rec = state[side];
+    if (!rec) continue;
+    const ctx = rec.overlay.getContext("2d");
+    const s = 1 / Math.max(0.01, dispScale(rec));
+    for (const m of kp.matches) {
+      const x = side === "src" ? m.src_x : m.tgt_x;
+      const y = side === "src" ? m.src_y : m.tgt_y;
+      ctx.beginPath();
+      ctx.arc(x, y, 3 * s, 0, Math.PI * 2);
+      ctx.fillStyle = side === "src" ? "#5acdff" : "#ffd166";
+      ctx.lineWidth = 1 * s;
+      ctx.strokeStyle = "rgba(0,0,0,0.7)";
+      ctx.fill();
+      ctx.stroke();
+    }
+  }
 }
 
 async function runTopN() {
@@ -375,6 +423,38 @@ function setupCanvasClicks() {
 $("srcFile").addEventListener("change", (e) => onFile("src", e.target.files[0]));
 $("tgtFile").addEventListener("change", (e) => onFile("tgt", e.target.files[0]));
 $("topBtn").addEventListener("click", () => runTopN());
+
+async function runKeypoints() {
+  if (!state.src || !state.tgt) { log("need both images first", "err"); return; }
+  state.busy = true; $("kpBtn").disabled = true;
+  try {
+    const scheme = $("kpScheme").value;
+    log(`detecting ${scheme} keypoints on source…`);
+    const t0 = performance.now();
+    const r = await api("/api/keypoint_correspondences", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        src_id: state.src.id, tgt_id: state.tgt.id,
+        scheme,
+        caption: $("caption").value,
+        feat_key: $("featKey").value,
+        restrict_to_salient: $("restrictSalient").checked,
+      }),
+    });
+    log(`keypoints done in ${(performance.now()-t0).toFixed(0)}ms · ${r.n_keypoints} detected · ${r.matches.length} matched`, "ok");
+    if (!r.matches.length) { log("no keypoints found", "err"); return; }
+    state.keypoint = { scheme, matches: r.matches, edges: r.edges || [] };
+    state.topMatches = [];
+    state.clickPoints = [];
+    await updateMaskOverlay();
+  } catch (e) {
+    log(`keypoints failed: ${e.message}`, "err");
+  } finally {
+    state.busy = false; $("kpBtn").disabled = false;
+  }
+}
+$("kpBtn").addEventListener("click", () => runKeypoints());
 $("nmsRadius").addEventListener("input", () => {
   $("nmsRadiusVal").textContent = parseFloat($("nmsRadius").value).toFixed(3);
 });

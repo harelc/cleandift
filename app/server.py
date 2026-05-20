@@ -187,6 +187,17 @@ class MatchRequest(BaseModel):
     salient_threshold: float = 0.5
 
 
+class KeypointCorrespondenceRequest(BaseModel):
+    src_id: str
+    tgt_id: str
+    scheme: str  # 'dwpose_body' | 'dwpose_face' | 'mediapipe_face'
+    caption: str = ""
+    feat_key: str = FEAT_KEY_DEFAULT
+    restrict_to_salient: bool = False
+    salient_threshold: float = 0.5
+    min_score: float = 0.3
+
+
 class TopMatchesRequest(BaseModel):
     src_id: str
     tgt_id: str
@@ -464,6 +475,69 @@ async def top_matches(req: TopMatchesRequest):
         })
     return {
         "matches": out,
+        "src_size": [src.width, src.height],
+        "tgt_size": [tgt.width, tgt.height],
+    }
+
+
+@app.post("/api/keypoint_correspondences")
+async def keypoint_correspondences(req: KeypointCorrespondenceRequest):
+    src = IMAGES.get(req.src_id)
+    tgt = IMAGES.get(req.tgt_id)
+    if not src or not tgt:
+        raise HTTPException(404, "unknown image_id")
+
+    from app.detectors import detect_keypoints
+
+    kpts = detect_keypoints(src.pil, req.scheme, min_score=req.min_score)
+    if not kpts:
+        return {"matches": [], "scheme": req.scheme, "n_keypoints": 0}
+
+    src_feats = compute_features(src, req.caption, req.feat_key)
+    tgt_feats = compute_features(tgt, req.caption, req.feat_key)
+    _, _, fhs, fws = src_feats.shape
+    _, _, fht, fwt = tgt_feats.shape
+
+    s = src_feats.float()
+    s = s / (s.norm(dim=1, keepdim=True) + 1e-8)
+    t = tgt_feats.float()
+    t = t / (t.norm(dim=1, keepdim=True) + 1e-8)
+    t_flat = einops.rearrange(t[0], "c h w -> c (h w)")  # [D, ht*wt]
+
+    tgt_mask_flat = None
+    if req.restrict_to_salient:
+        tgt_mask = _mask_to_feat_grid(compute_saliency(tgt), fht, fwt, req.salient_threshold)
+        tgt_mask_flat = tgt_mask.view(-1)
+
+    matches = []
+    for k in kpts:
+        u = k["x"] / max(1.0, src.width)
+        v = k["y"] / max(1.0, src.height)
+        fx = int(np.clip(u * fws, 0, fws - 1))
+        fy = int(np.clip(v * fhs, 0, fhs - 1))
+        q = s[0, :, fy, fx]  # [D]
+        sims = q @ t_flat  # [ht*wt]
+        if tgt_mask_flat is not None:
+            sims = sims.masked_fill(~tgt_mask_flat, -1.0)
+        idx = int(sims.argmax().item())
+        ty, tx = idx // fwt, idx % fwt
+        matches.append({
+            "idx": k["idx"],
+            "name": k["name"],
+            "src_x": k["x"],
+            "src_y": k["y"],
+            "tgt_x": (tx + 0.5) / fwt * tgt.width,
+            "tgt_y": (ty + 0.5) / fht * tgt.height,
+            "score": float(sims.max().item()),
+            "detect_score": k["score"],
+        })
+    from app.detectors import get_edges
+
+    return {
+        "matches": matches,
+        "scheme": req.scheme,
+        "n_keypoints": len(kpts),
+        "edges": get_edges(req.scheme),
         "src_size": [src.width, src.height],
         "tgt_size": [tgt.width, tgt.height],
     }

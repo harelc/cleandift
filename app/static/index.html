@@ -136,6 +136,15 @@
     <input type="checkbox" id="showMask" /> Show salient masks
   </label>
   <button id="topBtn" title="Compute top-N mutual correspondences">Find top correspondences</button>
+  <label>
+    Keypoints
+    <select id="kpScheme">
+      <option value="dwpose_body">DWPose body (17)</option>
+      <option value="dwpose_face">DWPose face (68)</option>
+      <option value="mediapipe_face">MediaPipe face (478)</option>
+    </select>
+  </label>
+  <button id="kpBtn" title="Detect keypoints on source and find correspondences on target">Detect &amp; match keypoints</button>
   <button id="clearBtn" title="Clear all dots, lines, and heatmaps">Clear</button>
   <button id="swapBtn" title="Swap source and target">⇄ Swap</button>
 </section>
