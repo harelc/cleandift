@@ -265,7 +265,7 @@ class StableFeatureAligner(nn.Module):
         if sd_version == "sd15":
             self.repo = "stable-diffusion-v1-5/stable-diffusion-v1-5"
         elif sd_version == "sd21":
-            self.repo = "stabilityai/stable-diffusion-2-1"
+            self.repo = "sd2-community/stable-diffusion-2-1"
         else:
             raise ValueError(f"Invalid SD version: {sd_version}")
 

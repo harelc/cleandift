@@ -25,7 +25,7 @@ model:
 
   ae:
     _target_: src.ae.AutoencoderKL
-    repo: stabilityai/stable-diffusion-2-1
+    repo: sd2-community/stable-diffusion-2-1
   mapping:
     _target_: src.utils.MappingSpec
     depth: 2
