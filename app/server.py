@@ -183,6 +183,8 @@ class MatchRequest(BaseModel):
     feat_key: str = FEAT_KEY_DEFAULT
     return_heatmap: bool = True
     heatmap_size: int = 256
+    restrict_to_salient: bool = False
+    salient_threshold: float = 0.5
 
 
 class TopMatchesRequest(BaseModel):
@@ -315,6 +317,10 @@ async def match(req: MatchRequest):
     q = s[0, :, fy, fx]  # [D]
     sims = einops.rearrange(t[0], "c h w -> (h w) c") @ q  # [ht*wt]
     sims = einops.rearrange(sims, "(h w) -> h w", h=fht)
+
+    if req.restrict_to_salient:
+        tgt_mask = _mask_to_feat_grid(compute_saliency(tgt), fht, fwt, req.salient_threshold)
+        sims = sims.masked_fill(~tgt_mask, -1.0)
 
     idx = int(sims.argmax().item())
     ty, tx = idx // fwt, idx % fwt

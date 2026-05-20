@@ -228,6 +228,7 @@ async function handleCanvasClick(which, ev) {
         caption: $("caption").value, feat_key: $("featKey").value,
         return_heatmap: $("showHeatmap").checked,
         heatmap_size: 256,
+        restrict_to_salient: $("restrictSalient").checked,
       }),
     });
     log(`match in ${(performance.now() - t0).toFixed(0)}ms · sim=${r.similarity.toFixed(3)}`, "ok");
