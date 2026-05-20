@@ -111,7 +111,7 @@ async function onFile(which, file) {
     rec.canvas = canvas;
     rec.overlay = overlay;
     clearOverlays();
-    relayoutCanvases();
+    requestAnimationFrame(relayoutCanvases);
     log(`${which} ready ${rec.w}x${rec.h}`, "ok");
   } catch (e) {
     log(`upload ${which} failed: ${e.message}`, "err");
@@ -360,7 +360,7 @@ $("swapBtn").addEventListener("click", () => {
   clearOverlays();
   relayoutCanvases();
 });
-window.addEventListener("resize", () => { relayoutCanvases(); });
+window.addEventListener("resize", () => requestAnimationFrame(relayoutCanvases));
 
 setupCanvasClicks();
 loadHealth();
