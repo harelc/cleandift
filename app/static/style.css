@@ -59,7 +59,7 @@ main#viewer > svg#lines { grid-column: 1 / -1; grid-row: 1; }
   /* Safety net before JS relayout assigns explicit pixel dims. */
   max-width: 100%;
 }
-.canvasWrap canvas:first-child { display: block; cursor: crosshair; }
+.canvasWrap canvas:first-of-type { display: block; cursor: crosshair; }
 .canvasWrap.empty {
   min-height: 220px;
   min-width: 220px;
@@ -83,7 +83,7 @@ main#viewer > svg#lines { grid-column: 1 / -1; grid-row: 1; }
   text-align: center;
   padding: 12px;
 }
-.canvasWrap canvas:nth-child(2) {
+.canvasWrap canvas:nth-of-type(2) {
   position: absolute; top: 0; left: 0; pointer-events: none;
 }
 
