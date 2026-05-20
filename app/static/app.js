@@ -52,22 +52,8 @@ function drawImage(canvas, img) {
 }
 
 function dispScale(rec) {
-  // With object-fit: contain, the image is letterboxed inside the canvas element.
   const r = rec.canvas.getBoundingClientRect();
-  return Math.min(r.width / rec.img.naturalWidth, r.height / rec.img.naturalHeight);
-}
-
-function dispRect(rec) {
-  // Return the actual on-screen bitmap rect (viewport coords), accounting for letterbox.
-  const r = rec.canvas.getBoundingClientRect();
-  const s = Math.min(r.width / rec.img.naturalWidth, r.height / rec.img.naturalHeight);
-  const dispW = rec.img.naturalWidth * s;
-  const dispH = rec.img.naturalHeight * s;
-  return {
-    left: r.left + (r.width - dispW) / 2,
-    top: r.top + (r.height - dispH) / 2,
-    width: dispW, height: dispH, scale: s,
-  };
+  return r.width / rec.img.naturalWidth;
 }
 
 async function uploadFile(file) {
@@ -169,11 +155,9 @@ function renderLines() {
   svg.setAttribute("preserveAspectRatio", "none");
 
   function paneCoord(rec, ix, iy) {
-    const d = dispRect(rec);
-    return {
-      x: d.left - svgR.left + ix * d.scale,
-      y: d.top - svgR.top + iy * d.scale,
-    };
+    const r = rec.canvas.getBoundingClientRect();
+    const s = r.width / rec.img.naturalWidth;
+    return { x: r.left - svgR.left + ix * s, y: r.top - svgR.top + iy * s };
   }
 
   const drawPair = (a, b, color) => {
@@ -203,12 +187,10 @@ async function handleCanvasClick(which, ev) {
   if (!rec || !other) { log("need both images first", "err"); return; }
   if (state.busy) return;
 
-  const d = dispRect(rec);
-  const ix = (ev.clientX - d.left) / d.scale;
-  const iy = (ev.clientY - d.top) / d.scale;
-  if (ix < 0 || iy < 0 || ix > rec.img.naturalWidth || iy > rec.img.naturalHeight) {
-    log("click outside image (letterbox)"); return;
-  }
+  const rect = rec.canvas.getBoundingClientRect();
+  const s = rect.width / rec.img.naturalWidth;
+  const ix = (ev.clientX - rect.left) / s;
+  const iy = (ev.clientY - rect.top) / s;
 
   state.busy = true;
   $("runBtn").disabled = true;
