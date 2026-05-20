@@ -146,27 +146,39 @@ def load_model():
 # Feature extraction helpers
 # ---------------------------------------------------------------------------
 
-def _preprocess(pil: Image.Image, size: int) -> torch.Tensor:
-    img = pil.convert("RGB").resize((size, size), Image.BICUBIC)
+def _target_dims(pil: Image.Image, long_side: int) -> tuple[int, int]:
+    """Compute aspect-preserving (W, H), both multiples of 64, long side ≈ long_side."""
+    target = max(256, (long_side // 64) * 64)
+    w0, h0 = pil.width, pil.height
+    if w0 >= h0:
+        w = target
+        h = max(64, int(round(target * h0 / w0 / 64)) * 64)
+    else:
+        h = target
+        w = max(64, int(round(target * w0 / h0 / 64)) * 64)
+    return w, h
+
+
+def _preprocess(pil: Image.Image, w: int, h: int) -> torch.Tensor:
+    img = pil.convert("RGB").resize((w, h), Image.BICUBIC)
     t = to_tensor(img)[None].to(DEVICE) * 2 - 1
     return t.to(DTYPE)
 
 
 def compute_features(rec: ImageRecord, caption: str, feat_key: str,
                      image_size: int | None = None) -> torch.Tensor:
-    size = int(image_size or IMAGE_SIZE)
-    # Snap to a UNet-friendly multiple of 64 (latent multiple of 8).
-    size = max(256, (size // 64) * 64)
-    key = (caption, feat_key, size)
+    long_side = int(image_size or IMAGE_SIZE)
+    w, h = _target_dims(rec.pil, long_side)
+    key = (caption, feat_key, w, h)
     if key in rec.features:
         return rec.features[key]
     model = load_model()
-    x = _preprocess(rec.pil, size)
+    x = _preprocess(rec.pil, w, h)
     with torch.no_grad():
         feats = model.get_features(x, [caption], t=None, feat_key=feat_key)
     rec.features[key] = feats
-    log.info("features %s caption=%r feat=%s size=%d -> %s", rec.image_id,
-             caption, feat_key, size, list(feats.shape))
+    log.info("features %s caption=%r feat=%s in=%dx%d -> %s", rec.image_id,
+             caption, feat_key, w, h, list(feats.shape))
     return feats
 
 
@@ -286,11 +298,10 @@ def _cos_sim_matrix(src_feats: torch.Tensor, tgt_feats: torch.Tensor) -> torch.T
 
 
 def _heatmap_png(sim: torch.Tensor, size: int) -> str:
-    """sim: [h, w] float; encode as colored png base64."""
+    """sim: [h, w] float; encode as colored png base64, aspect-preserving."""
     s = sim.detach().cpu().float().numpy()
     s = (s - s.min()) / (s.max() - s.min() + 1e-8)
     h, w = s.shape
-    # cheap colormap: viridis-like
     r = np.clip(1.5 * s - 0.4, 0, 1)
     g = np.clip(1.5 * s * (1 - s) * 4, 0, 1)
     b = np.clip(1.2 * (1 - s), 0, 1)
@@ -302,8 +313,11 @@ def _heatmap_png(sim: torch.Tensor, size: int) -> str:
         a,
     ], axis=-1)
     img = Image.fromarray(rgba, "RGBA")
+    # Resize the long side to `size`, preserving aspect.
     if max(h, w) != size:
-        img = img.resize((size, size), Image.BILINEAR)
+        scale = size / max(h, w)
+        img = img.resize((max(1, int(round(w * scale))),
+                          max(1, int(round(h * scale)))), Image.BILINEAR)
     buf = io.BytesIO()
     img.save(buf, format="PNG")
     return "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode()
