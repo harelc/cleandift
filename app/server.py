@@ -352,8 +352,11 @@ def _top_mutual_matches(src_feats, tgt_feats, n, min_sim, nms_radius_frac,
     sims = _cos_sim_matrix(src_feats, tgt_feats)  # [Ns, Nt]
     Ns, Nt = sims.shape
 
-    # If we have a target mask, suppress similarities to non-salient target
-    # locations so argmax never lands there.
+    # Mask out non-salient cells on BOTH sides before any argmax, so mutual-NN
+    # is computed within the salient region of each image.
+    if src_mask is not None:
+        flat_src = src_mask.view(-1)
+        sims = sims.masked_fill(~flat_src[:, None], -1.0)
     if tgt_mask is not None:
         flat_tgt = tgt_mask.view(-1)
         sims = sims.masked_fill(~flat_tgt[None, :], -1.0)
@@ -365,13 +368,27 @@ def _top_mutual_matches(src_feats, tgt_feats, n, min_sim, nms_radius_frac,
     src_idx = torch.arange(Ns, device=sims.device)
     mutual_mask = tgt_best[src_best] == src_idx
     mutual_mask &= src_best_val >= min_sim
-
     if src_mask is not None:
         mutual_mask &= src_mask.view(-1)
 
+    # Primary candidates: mutual NN within masks, ranked by similarity.
     cand_src = src_idx[mutual_mask]
     cand_tgt = src_best[mutual_mask]
     cand_score = src_best_val[mutual_mask]
+
+    # Top-up candidates: one-way matches (src->tgt argmax) inside the source
+    # mask. We'll only use these after exhausting mutual matches via NMS, so
+    # the result list always reaches `n` if there are enough salient cells.
+    extra_valid = src_best_val >= min_sim
+    if src_mask is not None:
+        extra_valid &= src_mask.view(-1)
+    extra_valid &= ~mutual_mask
+    extra_src = src_idx[extra_valid]
+    extra_tgt = src_best[extra_valid]
+    extra_score = src_best_val[extra_valid]
+    cand_src = torch.cat([cand_src, extra_src])
+    cand_tgt = torch.cat([cand_tgt, extra_tgt])
+    cand_score = torch.cat([cand_score, extra_score])
 
     order = torch.argsort(cand_score, descending=True)
     cand_src = cand_src[order].cpu().numpy()
