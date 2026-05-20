@@ -16,6 +16,11 @@
 
 This repository contains the official implementation of the paper "CleanDIFT: Diffusion Features without Noise".
 
+> ### 🖱️ Interactive correspondence finder
+> This fork adds a browser UI for finding semantic correspondences between two images
+> (click-to-match, top-N, salient-region restriction). See [`app/README.md`](app/README.md)
+> for detailed setup and run instructions for the GPU VM.
+
 We propose CleanDIFT, a novel method to extract noise-free, timestep-independent features by enabling diffusion models to work directly with clean input images. Our approach is efficient, training on a single GPU in just 30 minutes.
 
 ![teaser](./docs/static/images/teaser_fig.jpg)
