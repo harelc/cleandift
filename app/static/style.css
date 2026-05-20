@@ -11,9 +11,50 @@ header {
   display: flex; justify-content: space-between; align-items: center;
 }
 header h1 { font-size: 16px; margin: 0; font-weight: 600; }
+.headerRight { display: flex; align-items: center; gap: 14px; }
+.howBtn {
+  background: transparent; color: #93a0b4; border: 1px solid #2c3140;
+  padding: 4px 10px; border-radius: 4px; font-size: 12px; cursor: pointer;
+}
+.howBtn:hover { color: #e7e9ee; border-color: #3463e6; }
 .status { font-size: 12px; color: #93a0b4; }
 .status.ok #modelStatus { color: #6cd17b; }
 .status.err #modelStatus { color: #e96a6a; }
+
+.modal { position: fixed; inset: 0; z-index: 100; display: none; }
+.modal.open { display: block; }
+.modalBackdrop {
+  position: absolute; inset: 0;
+  background: rgba(8, 10, 14, 0.72);
+}
+.modalCard {
+  position: relative;
+  max-width: 760px;
+  margin: 6vh auto;
+  background: #12151c;
+  border: 1px solid #232733;
+  border-radius: 8px;
+  padding: 28px 32px 32px;
+  color: #c8d1e0;
+  max-height: 86vh;
+  overflow-y: auto;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+}
+.modalCard h2 { margin: 0 0 12px; font-size: 20px; color: #e7e9ee; }
+.modalCard h3 { margin: 18px 0 6px; font-size: 14px; color: #e7e9ee; }
+.modalCard p { margin: 6px 0; font-size: 13px; line-height: 1.55; }
+.modalCard ul, .modalCard ol { margin: 6px 0 6px 22px; font-size: 13px; line-height: 1.55; }
+.modalCard code {
+  background: #0a0c11; padding: 1px 5px; border-radius: 3px;
+  font-size: 12px; color: #e7e9ee;
+}
+.modalCard a { color: #7aa3ff; }
+.modalClose {
+  position: absolute; top: 10px; right: 12px;
+  background: transparent; border: none; color: #93a0b4;
+  font-size: 26px; line-height: 1; cursor: pointer; padding: 4px 8px;
+}
+.modalClose:hover { color: #e7e9ee; }
 
 .controls {
   display: flex; flex-wrap: wrap; gap: 12px; align-items: center;

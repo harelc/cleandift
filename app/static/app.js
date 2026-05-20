@@ -405,6 +405,13 @@ async function flipImage(which) {
 document.querySelectorAll(".flipBtn").forEach((btn) => {
   btn.addEventListener("click", () => flipImage(btn.dataset.which));
 });
+
+function openHow() { $("howModal").classList.add("open"); $("howModal").setAttribute("aria-hidden", "false"); }
+function closeHow() { $("howModal").classList.remove("open"); $("howModal").setAttribute("aria-hidden", "true"); }
+$("howBtn").addEventListener("click", openHow);
+$("howClose").addEventListener("click", closeHow);
+$("howModal").querySelector(".modalBackdrop").addEventListener("click", closeHow);
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeHow(); });
 $("clearBtn").addEventListener("click", () => {
   clearOverlays();
   renderLines();

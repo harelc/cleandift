@@ -9,8 +9,90 @@
 <body>
 <header>
   <h1>🧹 CleanDIFT — Interactive Correspondences</h1>
-  <div id="status" class="status">model: <span id="modelStatus">…</span></div>
+  <div class="headerRight">
+    <button id="howBtn" class="howBtn" title="How does this work?">How does it work?</button>
+    <div id="status" class="status">model: <span id="modelStatus">…</span></div>
+  </div>
 </header>
+
+<div id="howModal" class="modal" aria-hidden="true">
+  <div class="modalBackdrop"></div>
+  <div class="modalCard" role="dialog" aria-labelledby="howTitle" aria-modal="true">
+    <button id="howClose" class="modalClose" aria-label="Close">×</button>
+    <h2 id="howTitle">How does this work?</h2>
+
+    <h3>The model</h3>
+    <p>
+      <a href="https://compvis.github.io/cleandift/" target="_blank" rel="noopener">CleanDIFT</a>
+      (Stracke et al., CVPR 2025 oral) fine-tunes a Stable Diffusion 2.1 U-Net so that it
+      produces meaningful semantic features <em>directly from clean images</em> — no noise
+      injection, no timestep sweep. The U-Net is run once at <code>t = 261</code> on the
+      VAE-encoded clean image and we tap an internal up-block.
+    </p>
+
+    <h3>Feature extraction</h3>
+    <ul>
+      <li>Each uploaded image is resized to <code>768 × 768</code> and pushed through the model.</li>
+      <li>We read the <strong><code>us6</code></strong> activation by default — a
+        <code>(1280, 48, 48)</code> tensor on GPU. That's a 1280-D semantic descriptor for each
+        of 2304 spatial cells, each roughly covering a <code>16 × 16</code> patch of the input.</li>
+      <li>Features are computed once per (image, caption, feature-key) and cached on the GPU.</li>
+    </ul>
+
+    <h3>Click-to-match</h3>
+    <ol>
+      <li>Your click in the source image is mapped to a feature-grid cell <code>(fx, fy)</code>.</li>
+      <li>We L2-normalize all features and compute cosine similarity of the source descriptor
+        against every target cell.</li>
+      <li>The argmax cell becomes the predicted match; we render a coloured similarity heatmap
+        over the target so you can also see ambiguity / multimodality.</li>
+    </ol>
+
+    <h3>Top-N correspondences</h3>
+    <p>
+      We compute the full <code>2304 × 2304</code> cosine-similarity matrix between source and
+      target. A match is kept only if it is a <em>mutual nearest neighbour</em> (source's best
+      target points back at the source), then we rank by similarity and apply NMS in source-grid
+      space using the <strong>NMS radius</strong> slider. Lower radius → more matches packed
+      close together; higher radius → fewer, more spread-out matches.
+    </p>
+
+    <h3>Salient region restriction</h3>
+    <p>
+      When <em>Salient region only</em> is on, we run a salient-object detector
+      (<a href="https://github.com/danielgatis/rembg" target="_blank" rel="noopener">rembg</a>'s
+      <code>isnet-general-use</code> ISNet variant) on a 2×-downsampled copy of each image and
+      threshold the resulting alpha mask. The similarity matrix is then masked on
+      <em>both</em> sides before any argmax, so mutual nearest neighbours are computed only
+      between foreground cells. Top-up one-way matches kick in if the mutual pool can't reach N.
+    </p>
+
+    <h3>Horizontal flip</h3>
+    <p>
+      The ↔ button next to each pane mirrors the image server-side and clears the cached
+      features and saliency mask — so the next match request runs the full CleanDIFT pipeline
+      on the flipped pixels. Useful when an object faces the opposite direction in the two images.
+    </p>
+
+    <h3>Where the compute lives</h3>
+    <p>
+      The Stable Diffusion U-Net (~1.3 B params) and the ISNet saliency model both run on a
+      remote NVIDIA H100. This browser only talks to a FastAPI server over JSON; nothing is
+      computed locally.
+    </p>
+
+    <h3>Tips</h3>
+    <ul>
+      <li>Drop different feature keys to trade resolution for semantics —
+        <code>us4–us6</code> are 48×48 (coarser, more semantic),
+        <code>us7–us9</code> are 96×96 (finer, more textural).</li>
+      <li>Setting a relevant caption (e.g. "a photo of a dog") slightly conditions the U-Net via
+        the SD text encoder and can sharpen the features for that category.</li>
+      <li>First match per fresh image takes ~10–40 s (feature extraction); subsequent calls
+        on the same image are near-instant since features are cached on the GPU.</li>
+    </ul>
+  </div>
+</div>
 
 <section class="controls">
   <label class="file">
