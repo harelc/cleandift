@@ -463,6 +463,19 @@ async def top_matches(req: TopMatchesRequest):
     }
 
 
+@app.post("/api/flip/{image_id}")
+async def flip(image_id: str):
+    """Horizontally flip an image; invalidate cached features and saliency."""
+    rec = IMAGES.get(image_id)
+    if not rec:
+        raise HTTPException(404, "unknown image_id")
+    rec.pil = rec.pil.transpose(Image.FLIP_LEFT_RIGHT)
+    rec.features.clear()
+    rec.saliency = None
+    log.info("flipped %s", image_id)
+    return {"image_id": image_id, "width": rec.width, "height": rec.height}
+
+
 @app.get("/api/saliency/{image_id}")
 async def get_saliency(image_id: str):
     """Return the saliency mask as a PNG (grayscale, natural-image size)."""

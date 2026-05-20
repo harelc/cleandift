@@ -47,6 +47,12 @@ main#viewer {
   font-size: 12px; color: #93a0b4; margin-bottom: 6px; display: flex; justify-content: space-between;
 }
 .paneTitle .hint { color: #6b7385; }
+.paneTitle .flipBtn {
+  background: #1b1f29; color: #c8d1e0; border: 1px solid #2c3140;
+  padding: 1px 7px; border-radius: 4px; font-size: 12px; cursor: pointer;
+  margin-left: 6px;
+}
+.paneTitle .flipBtn:hover { background: #232733; }
 .canvasWrap {
   position: relative;
   display: inline-block;

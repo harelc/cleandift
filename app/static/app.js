@@ -377,6 +377,34 @@ $("topBtn").addEventListener("click", () => runTopN());
 $("nmsRadius").addEventListener("input", () => {
   $("nmsRadiusVal").textContent = parseFloat($("nmsRadius").value).toFixed(3);
 });
+
+async function flipImage(which) {
+  const rec = state[which];
+  if (!rec) { log(`no ${which} image to flip`, "err"); return; }
+  state.busy = true;
+  try {
+    await api(`/api/flip/${rec.id}`, { method: "POST" });
+    // Reload the <img> from server with cache-busting; also rebuild the in-memory
+    // Image() so naturalWidth still matches and dispScale stays correct.
+    const url = `/api/image/${rec.id}?ts=${Date.now()}`;
+    rec.imgEl.src = url;
+    const fresh = await loadImg(url);
+    rec.img = fresh;
+    rec.maskImg = null; // invalidate cached saliency overlay
+    clearOverlays();
+    relayoutCanvases();
+    await updateMaskOverlay();
+    log(`${which} flipped`, "ok");
+  } catch (e) {
+    log(`flip ${which} failed: ${e.message}`, "err");
+  } finally {
+    state.busy = false;
+  }
+}
+
+document.querySelectorAll(".flipBtn").forEach((btn) => {
+  btn.addEventListener("click", () => flipImage(btn.dataset.which));
+});
 $("clearBtn").addEventListener("click", () => {
   clearOverlays();
   renderLines();
