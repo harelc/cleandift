@@ -44,16 +44,39 @@ async function loadHealth() {
 }
 
 function drawImage(canvas, img) {
-  // Bitmap = natural size; CSS scales display to fill the pane (both panes equal-width).
   canvas.width = img.naturalWidth;
   canvas.height = img.naturalHeight;
-  const ctx = canvas.getContext("2d");
-  ctx.drawImage(img, 0, 0);
+  canvas.getContext("2d").drawImage(img, 0, 0);
 }
 
 function dispScale(rec) {
   const r = rec.canvas.getBoundingClientRect();
   return r.width / rec.img.naturalWidth;
+}
+
+function relayoutCanvases() {
+  // Shared scale: both canvases render at the same px-per-natural-px factor.
+  const paneEls = [$("srcWrap"), $("tgtWrap")];
+  // Subtract a few px for borders/padding inside .pane.
+  const paneW = Math.max(40, paneEls[0].parentElement.clientWidth - 2);
+  const maxH = Math.max(200, window.innerHeight * 0.7);
+  let maxNW = 0, maxNH = 0;
+  for (const k of ["src", "tgt"]) if (state[k]) {
+    maxNW = Math.max(maxNW, state[k].img.naturalWidth);
+    maxNH = Math.max(maxNH, state[k].img.naturalHeight);
+  }
+  if (!maxNW) return;
+  const scale = Math.min(paneW / maxNW, maxH / maxNH, 1.5);
+  for (const k of ["src", "tgt"]) if (state[k]) {
+    const w = Math.round(state[k].img.naturalWidth * scale);
+    const h = Math.round(state[k].img.naturalHeight * scale);
+    for (const c of [state[k].canvas, state[k].overlay]) {
+      c.style.width = w + "px";
+      c.style.height = h + "px";
+    }
+  }
+  redrawDots();
+  renderLines();
 }
 
 async function uploadFile(file) {
@@ -87,6 +110,7 @@ async function onFile(which, file) {
     rec.canvas = canvas;
     rec.overlay = overlay;
     clearOverlays();
+    relayoutCanvases();
     log(`${which} ready ${rec.w}x${rec.h}`, "ok");
   } catch (e) {
     log(`upload ${which} failed: ${e.message}`, "err");
@@ -333,8 +357,9 @@ $("swapBtn").addEventListener("click", () => {
     }
   }
   clearOverlays();
+  relayoutCanvases();
 });
-window.addEventListener("resize", renderLines);
+window.addEventListener("resize", () => { relayoutCanvases(); });
 
 setupCanvasClicks();
 loadHealth();
