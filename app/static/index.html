@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>CleanDIFT — Interactive Correspondences</title>
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+<header>
+  <h1>🧹 CleanDIFT — Interactive Correspondences</h1>
+  <div id="status" class="status">model: <span id="modelStatus">…</span></div>
+</header>
+
+<section class="controls">
+  <label class="file">
+    Source image
+    <input type="file" id="srcFile" accept="image/*" />
+  </label>
+  <label class="file">
+    Target image
+    <input type="file" id="tgtFile" accept="image/*" />
+  </label>
+  <label>
+    Caption
+    <input type="text" id="caption" value="" placeholder='e.g. "a photo of a dog"' />
+  </label>
+  <label>
+    Feature
+    <select id="featKey">
+      <option value="us4">us4 (finer)</option>
+      <option value="us5">us5</option>
+      <option value="us6" selected>us6 (recommended)</option>
+      <option value="us7">us7</option>
+      <option value="us8">us8</option>
+      <option value="us9">us9 (coarser)</option>
+    </select>
+  </label>
+  <label>
+    Mode
+    <select id="mode">
+      <option value="click" selected>Click for correspondence</option>
+      <option value="top">Show top-N correspondences</option>
+    </select>
+  </label>
+  <label id="topNWrap" style="display:none">
+    N <input type="number" id="topN" value="12" min="1" max="100" style="width:4em" />
+  </label>
+  <label>
+    <input type="checkbox" id="showHeatmap" checked /> Heatmap overlay
+  </label>
+  <button id="runBtn">Run</button>
+  <button id="swapBtn" title="Swap source and target">⇄ Swap</button>
+</section>
+
+<main id="viewer">
+  <div class="pane">
+    <div class="paneTitle">Source <span class="hint">click to find its match →</span></div>
+    <div class="canvasWrap" id="srcWrap">
+      <canvas id="srcCanvas"></canvas>
+      <canvas id="srcOverlay"></canvas>
+    </div>
+  </div>
+  <svg id="lines"></svg>
+  <div class="pane">
+    <div class="paneTitle">Target <span class="hint">← click to find its match</span></div>
+    <div class="canvasWrap" id="tgtWrap">
+      <canvas id="tgtCanvas"></canvas>
+      <canvas id="tgtOverlay"></canvas>
+    </div>
+  </div>
+</main>
+
+<footer>
+  <div id="log"></div>
+</footer>
+
+<script src="/app.js"></script>
+</body>
+</html>
