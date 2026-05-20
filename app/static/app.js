@@ -220,7 +220,6 @@ async function handleCanvasClick(which, ev) {
   const iy = (ev.clientY - rect.top) / s;
 
   state.busy = true;
-  $("runBtn").disabled = true;
   try {
     log(`matching click on ${which} (${ix.toFixed(1)}, ${iy.toFixed(1)})`);
     const t0 = performance.now();
@@ -258,7 +257,6 @@ async function handleCanvasClick(which, ev) {
     log(`match failed: ${e.message}`, "err");
   } finally {
     state.busy = false;
-    $("runBtn").disabled = false;
   }
 }
 
@@ -300,7 +298,7 @@ function redrawDots() {
 
 async function runTopN() {
   if (!state.src || !state.tgt) { log("need both images first", "err"); return; }
-  state.busy = true; $("runBtn").disabled = true;
+  state.busy = true; $("topBtn").disabled = true;
   try {
     const n = Math.max(1, parseInt($("topN").value || "12", 10));
     log(`computing top ${n} mutual matches…`);
@@ -323,7 +321,7 @@ async function runTopN() {
   } catch (e) {
     log(`top-N failed: ${e.message}`, "err");
   } finally {
-    state.busy = false; $("runBtn").disabled = false;
+    state.busy = false; $("topBtn").disabled = false;
   }
 }
 
@@ -334,13 +332,7 @@ function setupCanvasClicks() {
 
 $("srcFile").addEventListener("change", (e) => onFile("src", e.target.files[0]));
 $("tgtFile").addEventListener("change", (e) => onFile("tgt", e.target.files[0]));
-$("mode").addEventListener("change", () => {
-  $("topNWrap").style.display = $("mode").value === "top" ? "" : "none";
-});
-$("runBtn").addEventListener("click", () => {
-  if ($("mode").value === "top") runTopN();
-  else { clearOverlays(); renderLines(); log("ready — click an image to match."); }
-});
+$("topBtn").addEventListener("click", () => runTopN());
 $("clearBtn").addEventListener("click", () => {
   clearOverlays();
   renderLines();

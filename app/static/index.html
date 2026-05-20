@@ -37,19 +37,12 @@
     </select>
   </label>
   <label>
-    Mode
-    <select id="mode">
-      <option value="click" selected>Click for correspondence</option>
-      <option value="top">Show top-N correspondences</option>
-    </select>
-  </label>
-  <label id="topNWrap" style="display:none">
-    N <input type="number" id="topN" value="12" min="1" max="100" style="width:4em" />
-  </label>
-  <label>
     <input type="checkbox" id="showHeatmap" checked /> Heatmap overlay
   </label>
-  <button id="runBtn">Run</button>
+  <label>
+    N <input type="number" id="topN" value="12" min="1" max="200" style="width:4em" />
+  </label>
+  <button id="topBtn" title="Compute top-N mutual correspondences">Find top correspondences</button>
   <button id="clearBtn" title="Clear all dots, lines, and heatmaps">Clear</button>
   <button id="swapBtn" title="Swap source and target">⇄ Swap</button>
 </section>
