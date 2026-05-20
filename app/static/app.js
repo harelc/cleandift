@@ -56,17 +56,18 @@ function dispScale(rec) {
 
 function relayoutCanvases() {
   // Shared scale: both canvases render at the same px-per-natural-px factor.
-  const paneEls = [$("srcWrap"), $("tgtWrap")];
-  // Subtract a few px for borders/padding inside .pane.
-  const paneW = Math.max(40, paneEls[0].parentElement.clientWidth - 2);
-  const maxH = Math.max(200, window.innerHeight * 0.7);
+  // Fill the larger of the two panes; cap height at most of the viewport.
+  const paneEls = [$("srcWrap").parentElement, $("tgtWrap").parentElement];
+  const paneW = Math.max(40, Math.min(...paneEls.map((p) => p.clientWidth)) - 4);
+  const maxH = Math.max(240, window.innerHeight * 0.82);
   let maxNW = 0, maxNH = 0;
   for (const k of ["src", "tgt"]) if (state[k]) {
     maxNW = Math.max(maxNW, state[k].img.naturalWidth);
     maxNH = Math.max(maxNH, state[k].img.naturalHeight);
   }
   if (!maxNW) return;
-  const scale = Math.min(paneW / maxNW, maxH / maxNH, 1.5);
+  // Allow upscaling up to 3x so small thumbnails are visible.
+  const scale = Math.min(paneW / maxNW, maxH / maxNH, 3);
   for (const k of ["src", "tgt"]) if (state[k]) {
     const w = Math.round(state[k].img.naturalWidth * scale);
     const h = Math.round(state[k].img.naturalHeight * scale);
